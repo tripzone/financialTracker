@@ -1,0 +1,16 @@
+.file-selected {
+	color: green;
+}
+
+.dropfile-zone {
+	justify-content: center;
+	display: flex;
+}
+
+.dropfile-upload-button {
+	margin: 20px;
+}
+
+.dropfile-list {
+	margin: 20px;
+}

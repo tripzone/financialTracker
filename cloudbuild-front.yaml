@@ -1,0 +1,24 @@
+steps:
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['install']
+  dir: 'frontend/'
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['run', 'build']
+  dir: 'frontend/'
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'gcr.io/bankdash22/bankdash-front:1.$BUILD_ID', '.' ]
+  dir: 'frontend/'
+- name: 'gcr.io/cloud-builders/docker'
+  args: ["push", "gcr.io/bankdash22/bankdash-front:1.$BUILD_ID"]
+  dir: 'frontend/'
+- name: 'gcr.io/cloud-builders/kubectl'
+  args:
+  - 'set'
+  - 'image'
+  - 'deployment'
+  - 'bankdash-front-app'
+  - 'bankdash-front=gcr.io/bankdash22/bankdash-front:1.$BUILD_ID'
+  dir: 'frontend/'
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=us-central1-a'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=bankdash-cluster'
