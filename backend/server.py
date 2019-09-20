@@ -2,7 +2,7 @@ from flask import Flask, request, redirect, jsonify
 from flask_cors import CORS
 import pandas as pd
 import json
-from process import runProcess, convertToJsonArray, getFile, writeFile, changeSubcategory, resetToCurrentData
+from process import runProcess, convertToJsonArray, getFile, writeFile, changeSubcategory, resetToCurrentData, getTransactions, parseDateBody
 import os
 import logging
 from gcp import upload_blob, download_blob
@@ -75,6 +75,24 @@ def process_files():
 		results = runProcess(allFilesTransformed)
 		# print(convertToJsonArray(results))
 		return json.dumps({"success":True, "missing":results['missing'], "data": convertToJsonArray(results['items'])}), 200, {"ContentType":"application/json"}
+
+@app.route('/plaid', methods=['POST'])
+def plaid():
+	global allFiles
+	if request.method == 'POST':
+			dateBody =  json.loads(request.data)
+			startDate, endDate = parseDateBody(dateBody)
+
+			df = getTransactions(startDate,endDate)
+			print('got plaid tx in range:', startDate, ' ', endDate, ' Found:', len(df));
+			# file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+			for card in df['card'].unique():
+				if card != 'USD': 
+					allFiles[card] = df[df['card']==card];
+			return json.dumps({"success":True, "data":{'plaidRecordsFound': len(df), 'accounts':list(df['card'].unique())}}), 200, {"ContentType":"application/json"}
+	else:
+		return json.dumps({"success":False, "error":"extension not accepted"}), 400, {"ContentType":"application/json"}
+
 
 @app.route('/getCategories', methods=['GET'])
 def get_categories():

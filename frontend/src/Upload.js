@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import Dropfile from './components/Dropfile'
 import ItemList from './components/ItemList'
 import MissingItem from './components/MissingItem'
+import MonthPicker from './components/MonthPicker'
 import { Button, Icon } from 'react-materialize'
 import { serverPath } from './variables'
 import './Upload.css';
@@ -17,13 +18,17 @@ class Upload extends Component {
       missing: null,
       newOneOnOnes: {},
       newCategories: {},
+      startDate: null,
+      endDate: null,
+      year: 2019,
     }
 
     this.submitFile = this.submitFile.bind(this);
     this.process = this.process.bind(this);
     this.oneToOneSubmit = this.oneToOneSubmit.bind(this);
     this.categoriesSubmit = this.categoriesSubmit.bind(this);
-
+    this.setStartDate = this.setStartDate.bind(this);
+    this.setEndDate = this.setEndDate.bind(this);
 
   }
 
@@ -64,6 +69,14 @@ class Upload extends Component {
         processedData: response.data,
         missing: response.missing,
       }));
+  }
+
+  plaid() {
+    fetch(serverPath + '/plaid', {
+      method: 'POST',
+      body: JSON.stringify({ startDate: this.state.startDate, endDate: this.state.endDate, year: this.state.year })
+    }).then(response => response.json())
+      .then(response => this.setState({ backendFiles: response.data }))
   }
 
   oneToOneSubmit(text, category) {
@@ -169,6 +182,20 @@ class Upload extends Component {
     });
   }
 
+  setStartDate(value) {
+    console.log('setstart to', value)
+    this.setState({
+      startDate: value
+    })
+  }
+
+  setEndDate(value) {
+    console.log('set end to', value)
+
+    this.setState({
+      endDate: value
+    })
+  }
 
   render() {
     return (
@@ -176,6 +203,11 @@ class Upload extends Component {
 
         {!this.state.processFinished &&
           <div>
+            <div className="monthpickers">
+              <MonthPicker onSubmit={this.setStartDate} />
+              <MonthPicker onSubmit={this.setEndDate} />
+              <Button floating waves='light' className='marginleft' icon='adjust' onClick={() => this.plaid()}></Button>
+            </div>
             <Dropfile submitFile={this.submitFile} process={this.process} backendFiles={this.state.backendFiles} />
             <Button floating waves='light' className='marginleft' icon='autorenew' onClick={() => this.reprocess()}></Button>
           </div>

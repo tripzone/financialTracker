@@ -4,12 +4,17 @@ import math
 import hashlib, binascii
 import numpy as np
 import time
-from datetime import datetime
+from datetime import timedelta
 from shutil import copyfile
 from os import listdir
 import re
 from gcp import upload_blob, download_blob, upload_json
 from io import StringIO
+import plaid
+import sys
+sys.path.insert(1, '../private')
+import keys as keys
+import datetime
 
 saveLocation = 'local'
 def getFiles():
@@ -60,8 +65,7 @@ def getFile(file):
             return pd.read_csv(download, header=None, names=['subCategory', 'category'])
 
 def writeFile(file, df):
-    miliTime = int(round(time.time()))
-    readableTime = datetime.utcfromtimestamp(miliTime).strftime('%Y-%m-%d')
+    readableTime = datetime.datetime.now().strftime('%Y-%m-%d')
 
     global saveLocation
     if (saveLocation=='local'):
@@ -87,11 +91,11 @@ def writeFile(file, df):
 
 def writeToJson(df):
     miliTime = int(round(time.time()))
-    readableTime = datetime.utcfromtimestamp(miliTime).strftime('%Y-%m-%d')
+    readableTime = datetime.datetime.now().strftime('%Y-%m-%d')
 
     items = convertToJsonArray(df)
     if (saveLocation == "local"):
-        with open('../analysis/js/data.json', 'w') as jsonFile:
+        with open('../private/data.json', 'w') as jsonFile:
             json.dump(items, jsonFile)
     if (saveLocation == "gcs"):
         io = StringIO()
@@ -131,8 +135,7 @@ def fixDf(df):
     return df
 
 def saveDf(df, fileName, header):
-    miliTime = int(round(time.time()))
-    readableTime = datetime.utcfromtimestamp(miliTime).strftime('%Y-%m-%d')
+    readableTime = datetime.datetime.now().strftime('%Y-%m-%d')
 
     global saveLocation
     if (saveLocation=="local"):
@@ -236,7 +239,7 @@ def processData(newItems,doAll = False):
     subCatArray = pd.Series(subCatArray) 
 
     for i, categoryRow in subCategories.iloc[::-1].iterrows():
-        indo = ((data['item'].str.contains(categoryRow['item'])) & (data['subCategory']==""))
+        indo = ((data['item'].str.upper().str.contains(categoryRow['item'].upper())) & (data['subCategory']==""))
         subCatArray[indo] = categoryRow['subCategory']
 
     data['balance']=data['credit']-data['debit']
@@ -291,6 +294,85 @@ def resetToCurrentData():
 
 # files = getFiles()
 # runProcess(files)
+
+
+def accountName(name, accountList):
+    result = None
+#     result = 'debit' if name=='1XxA8g36Dks69YKZVM3Yfbgpprwo7ECmVv9zw' else None
+    if result == None:
+        result= accountList[accountList['accountId']==name]['account'].values[0]
+    if (result == "Visa Cad"):
+        result = "visa"
+    elif (result == 'Personal Line Of Credit'):
+        result = "line"
+    elif (result=="Eadvantage Savings Account"):
+        result = "savings"
+    elif (result=="Tfsa Tax Advantage Savings Account"):
+        result= "TFSA"
+    elif (result== "Personal Chequing Account USD"):
+        result = "USD"
+    elif (result=="CIBC Smart Account"):
+        result = "debit"
+        
+    return result
+
+client = plaid.Client(client_id = keys.PLAID_CLIENT_ID, secret=keys.PLAID_SECRET,
+                      public_key=keys.PLAID_PUBLIC_KEY, environment=keys.PLAID_ENV, api_version='2019-05-29')
+
+
+def getTransactions(start_date, end_date):
+    
+    response = client.Transactions.get(keys.access_token,
+                                       start_date=start_date,
+                                       end_date=end_date, count=500)
+    print("# Transactions found" , response['total_transactions'])
+    
+    accountList= pd.DataFrame(columns=['account', 'subtype', 'type', 'balanceA', 'balanceC' , 'accountId'])
+    for account in response['accounts']:
+        name = account['name']
+        subtype = account['subtype']
+        type = account['type']
+        balanceA= account['balances']['available']
+        balanceC= account['balances']['current']
+        accountId= account['account_id']
+
+        b = pd.Series({'account':name,'subtype':subtype,'type':type, 'balanceA':balanceA, 'balanceC':balanceC, 'accountId':accountId})
+        accountList = accountList.append(b, ignore_index=True )
+        
+        
+    transactions = response['transactions']
+
+    # Manipulate the count and offset parameters to paginate
+    # transactions and retrieve all available data
+    while len(transactions) < response['total_transactions']:
+        response = client.Transactions.get(keys.access_token,
+                                           start_date='2018-01-01',
+                                           end_date='2019-02-01',
+                                           offset=len(transactions)
+                                          )
+        transactions.extend(response['transactions'])
+    tx= pd.DataFrame(columns=['date', 'item', 'debit','credit', 'card'])
+    
+    for account in transactions:
+        name = account['name']
+        date = account['date']
+        debit = account['amount'] if account['amount'] >= 0 else 0;
+        credit = -account['amount'] if account['amount'] < 0 else 0;        
+        accountId= accountName(account['account_id'], accountList)
+
+        b = pd.Series({'date':date,'item':name,'debit':debit, 'credit':credit, 'card':accountId})
+        tx = tx.append(b, ignore_index=True )
+    return tx
+
+def parseDateBody(dateBody):
+    print(dateBody)
+    year = int(dateBody['year'])
+    startdate = int(dateBody['startDate'])
+    enddate = int(dateBody['endDate'])
+    start = datetime.date(year, startdate, 1).strftime("%Y-%m-%d")
+    end = datetime.date(year, enddate+1, 1) + timedelta(days = -1)
+    end = end.strftime("%Y-%m-%d")
+    return start,end
 
 def alibaba():
     print('hello234')

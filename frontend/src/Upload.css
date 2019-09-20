@@ -10,3 +10,8 @@
 .marginleft {
 	margin-left: 10px;
 }
+
+.monthpickers{
+  display: flex;
+  justify-content: center
+}
