@@ -316,8 +316,8 @@ def accountName(name, accountList):
         
     return result
 
-client = plaid.Client(client_id = keys.PLAID_CLIENT_ID, secret=keys.PLAID_SECRET,
-                      public_key=keys.PLAID_PUBLIC_KEY, environment=keys.PLAID_ENV, api_version='2019-05-29')
+# client = plaid.Client(client_id = keys.PLAID_CLIENT_ID, secret=keys.PLAID_SECRET,
+#                       public_key=keys.PLAID_PUBLIC_KEY, environment=keys.PLAID_ENV, api_version='2019-05-29')
 
 
 def getTransactions(start_date, end_date):
